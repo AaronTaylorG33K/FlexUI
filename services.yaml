@@ -1,0 +1,44 @@
+# Service for PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: flexui
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+# Service for .NET application
+apiVersion: v1
+kind: Service
+metadata:
+  name: dotnet
+  namespace: flexui
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: dotnet
+
+---
+# Service for Remix application
+apiVersion: v1
+kind: Service
+metadata:
+  name: remix
+  namespace: flexui
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: remix
