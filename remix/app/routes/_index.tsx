@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { MetaFunction } from "@remix-run/node";
 
 export const meta: MetaFunction = () => {
@@ -11,36 +11,38 @@ export const meta: MetaFunction = () => {
 export default function Index() {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState("");
+  const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:5555/ws");
+    ws.current = new WebSocket("ws://localhost:5555/ws");
 
-    ws.onopen = (event) => {
-      console.log("open", event);
-      console.log("Connected to WebSocket server");
-      ws.send("Initial data request");
+    ws.current.onopen = () => {
+      ws.current?.send("");
     };
 
-    ws.onmessage = (event) => {
-      console.log("Received message from WebSocket server", event.data);
-      setMessages((prevMessages) => [...prevMessages, event.data]);
+    ws.current.onmessage = (event) => {
+      const data = event.data
+      console.log("Received message from WebSocket server", {data});
+      setMessages((prevMessages) => [...prevMessages, data]);
+      localStorage.setItem("messages", data);
     };
 
-    ws.onclose = () => {
+    ws.current.onclose = () => {
       console.log("Disconnected from WebSocket server");
     };
 
+
+    
     return () => {
-      ws.close();
+      ws.current?.close();
     };
   }, []);
 
   const sendMessage = () => {
-    const ws = new WebSocket("ws://localhost:5555/ws");
-    ws.onopen = () => {
-      ws.send(input);
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(input);
       setInput("");
-    };
+    }
   };
 
   return (

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
@@ -12,6 +13,8 @@ namespace FlexUI.Services
 {
     public class FlexUI
     {
+        private static readonly ConcurrentDictionary<WebSocket, WebSocket> _clients = new ConcurrentDictionary<WebSocket, WebSocket>();
+
         public IEnumerable<string> GetPages()
         {
             return new List<string> { "Home", "About", "Contact" };
@@ -27,6 +30,7 @@ namespace FlexUI.Services
             if (context.WebSockets.IsWebSocketRequest)
             {
                 using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                _clients.TryAdd(webSocket, webSocket);
                 await SendPagesAndComponentsAsync(webSocket);
             }
             else
@@ -51,19 +55,24 @@ namespace FlexUI.Services
                         break;
                     }
 
+
                     var pages = GetPages();
                     var components = GetComponents();
 
-                    var data = new
+                    var receivedMessage = Encoding.UTF8.GetString(buffer, 0, receiveResult.Count);
+
+                    var responseData = new
                     {
-                        Pages = pages,
-                        Components = components
+                        data = new
+                        {
+                            pages = pages,
+                            components = components
+                        },
+                        message = receivedMessage
                     };
 
-                    var json = JsonSerializer.Serialize(data);
-                    var sendBuffer = Encoding.UTF8.GetBytes(json);
-
-                    await webSocket.SendAsync(new ArraySegment<byte>(sendBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
+                    var message = JsonSerializer.Serialize(responseData);
+                    await BroadcastMessageAsync(message);
                 }
             }
             catch (WebSocketException ex)
@@ -84,6 +93,7 @@ namespace FlexUI.Services
             }
             finally
             {
+                _clients.TryRemove(webSocket, out _);
                 if (webSocket.State != WebSocketState.Closed)
                 {
                     webSocket.Dispose();
@@ -91,26 +101,43 @@ namespace FlexUI.Services
             }
         }
 
-        public class WebSocketDocumentFilter : IDocumentFilter
+        private async Task BroadcastMessageAsync(string message)
         {
-            public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
+            var sendBuffer = Encoding.UTF8.GetBytes(message);
+            var tasks = new List<Task>();
+
+            foreach (var client in _clients.Keys)
             {
-                swaggerDoc.Paths.Add("/ws", new OpenApiPathItem
+                if (client.State == WebSocketState.Open)
                 {
-                    Operations = new Dictionary<OperationType, OpenApiOperation>
-                    {
-                        [OperationType.Get] = new OpenApiOperation
-                        {
-                            Summary = "WebSocket endpoint - ws:// protocol",
-                            Description = "Endpoint for WebSocket connections. Access via ws:// protocol.",
-                            Tags = new List<OpenApiTag> { new OpenApiTag { Name = "WebSocket" } },
-                            Responses = new OpenApiResponses
-                            {
-                                ["101"] = new OpenApiResponse { Description = "Switching Protocols" }
-                            }
-                        }
-                    }
-                });
+                    tasks.Add(client.SendAsync(new ArraySegment<byte>(sendBuffer), WebSocketMessageType.Text, true, CancellationToken.None));
+                }
             }
+
+            await Task.WhenAll(tasks);
         }
     }
+
+    public class WebSocketDocumentFilter : IDocumentFilter
+    {
+        public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
+        {
+            swaggerDoc.Paths.Add("/ws", new OpenApiPathItem
+            {
+                Operations = new Dictionary<OperationType, OpenApiOperation>
+                {
+                    [OperationType.Get] = new OpenApiOperation
+                    {
+                        Summary = "WebSocket endpoint - ws:// protocol",
+                        Description = "Endpoint for WebSocket connections. Access via ws:// protocol.",
+                        Tags = new List<OpenApiTag> { new OpenApiTag { Name = "WebSocket" } },
+                        Responses = new OpenApiResponses
+                        {
+                            ["101"] = new OpenApiResponse { Description = "Switching Protocols" }
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
