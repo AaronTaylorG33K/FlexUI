@@ -37,46 +37,80 @@ namespace FlexUI.Services
 
         private async Task SendPagesAndComponentsAsync(WebSocket webSocket)
         {
-            var pages = GetPages();
-            var components = GetComponents();
+            var buffer = new byte[1024 * 4];
 
-            var data = new
+            try
             {
-                Pages = pages,
-                Components = components
-            };
-
-            var json = JsonSerializer.Serialize(data);
-            var buffer = Encoding.UTF8.GetBytes(json);
-
-            var segment = new ArraySegment<byte>(buffer);
-
-            await webSocket.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
-
-            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Done", CancellationToken.None);
-        }
-    }
-
-     public class WebSocketDocumentFilter : IDocumentFilter
-    {
-        public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
-        {
-            swaggerDoc.Paths.Add("/ws", new OpenApiPathItem
-            {
-                Operations = new Dictionary<OperationType, OpenApiOperation>
+                while (webSocket.State == WebSocketState.Open)
                 {
-                    [OperationType.Get] = new OpenApiOperation
+                    var receiveResult = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+
+                    if (receiveResult.MessageType == WebSocketMessageType.Close)
                     {
-                        Summary = "WebSocket endpoint - ws:// protocol",
-                        Description = "Endpoint for WebSocket connections. Access via ws:// protocol.",
-                        Tags = new List<OpenApiTag> { new OpenApiTag { Name = "WebSocket" } },
-                        Responses = new OpenApiResponses
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                        break;
+                    }
+
+                    var pages = GetPages();
+                    var components = GetComponents();
+
+                    var data = new
+                    {
+                        Pages = pages,
+                        Components = components
+                    };
+
+                    var json = JsonSerializer.Serialize(data);
+                    var sendBuffer = Encoding.UTF8.GetBytes(json);
+
+                    await webSocket.SendAsync(new ArraySegment<byte>(sendBuffer), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+            }
+            catch (WebSocketException ex)
+            {
+                Console.WriteLine($"WebSocket error: {ex.Message}");
+                if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived)
+                {
+                    await webSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, "WebSocket error", CancellationToken.None);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error: {ex.Message}");
+                if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived)
+                {
+                    await webSocket.CloseAsync(WebSocketCloseStatus.InternalServerError, "Unexpected error", CancellationToken.None);
+                }
+            }
+            finally
+            {
+                if (webSocket.State != WebSocketState.Closed)
+                {
+                    webSocket.Dispose();
+                }
+            }
+        }
+
+        public class WebSocketDocumentFilter : IDocumentFilter
+        {
+            public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
+            {
+                swaggerDoc.Paths.Add("/ws", new OpenApiPathItem
+                {
+                    Operations = new Dictionary<OperationType, OpenApiOperation>
+                    {
+                        [OperationType.Get] = new OpenApiOperation
                         {
-                            ["101"] = new OpenApiResponse { Description = "Switching Protocols" }
+                            Summary = "WebSocket endpoint - ws:// protocol",
+                            Description = "Endpoint for WebSocket connections. Access via ws:// protocol.",
+                            Tags = new List<OpenApiTag> { new OpenApiTag { Name = "WebSocket" } },
+                            Responses = new OpenApiResponses
+                            {
+                                ["101"] = new OpenApiResponse { Description = "Switching Protocols" }
+                            }
                         }
                     }
-                }
-            });
+                });
+            }
         }
     }
-}
