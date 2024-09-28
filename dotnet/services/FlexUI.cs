@@ -6,23 +6,90 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.OpenApi.Models;
+using Npgsql;
 using Swashbuckle.AspNetCore.SwaggerGen;
+
+public class Page
+{
+    public int Id { get; set; }
+    public string Title { get; set; }
+    public string Slug { get; set; }
+    public string Content { get; set; }
+}
 
 namespace FlexUI.Services
 {
     public class FlexUI
     {
         private static readonly ConcurrentDictionary<WebSocket, WebSocket> _clients = new ConcurrentDictionary<WebSocket, WebSocket>();
+        private readonly string _connectionString;
 
-        public IEnumerable<string> GetPages()
+        public FlexUI(IConfiguration configuration)
         {
-            return new List<string> { "Home", "About", "Contact" };
+            _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        public IEnumerable<string> GetComponents()
+        public async Task<IEnumerable<Page>> GetPages()
         {
-            return new List<string> { "Header", "Footer", "Sidebar" };
+            var pages = new List<Page>();
+
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                using (var command = new NpgsqlCommand("SELECT id, title, slug, content FROM pages", connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var page = new Page
+                            {
+                                Id = reader.GetInt32(0),
+                                Title = reader.GetString(1),
+                                Slug = reader.GetString(2),
+                                Content = reader.GetString(3)
+                            };
+                            pages.Add(page);
+                        }
+                    }
+                }
+            }
+
+            return pages;
+        }
+
+        public async Task<IEnumerable<Component>> GetComponents()
+        {
+            var components = new List<Component>();
+
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                using (var command = new NpgsqlCommand("SELECT id, page_id, name, settings, ordinal FROM components", connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var component = new Component
+                            {
+                                Id = reader.GetInt32(0),
+                                PageId = reader.GetInt32(1),
+                                Name = reader.GetString(2),
+                                Settings = reader.GetString(3),
+                                Ordinal = reader.GetInt32(4)
+                            };
+                            components.Add(component);
+                        }
+                    }
+                }
+            }
+
+            return components;
         }
 
         public async Task HandleWebSocketAsync(HttpContext context)
@@ -55,11 +122,8 @@ namespace FlexUI.Services
                         break;
                     }
 
-
-                    var pages = GetPages();
-                    var components = GetComponents();
-
-                    var receivedMessage = Encoding.UTF8.GetString(buffer, 0, receiveResult.Count);
+                    var pages = await GetPages();
+                    var components = await GetComponents();
 
                     var responseData = new
                     {
@@ -67,8 +131,7 @@ namespace FlexUI.Services
                         {
                             pages = pages,
                             components = components
-                        },
-                        message = receivedMessage
+                        }
                     };
 
                     var message = JsonSerializer.Serialize(responseData);
@@ -116,6 +179,15 @@ namespace FlexUI.Services
 
             await Task.WhenAll(tasks);
         }
+    }
+
+    public class Component
+    {
+        public int Id { get; set; }
+        public int PageId { get; set; }
+        public string Name { get; set; }
+        public string Settings { get; set; }
+        public int Ordinal { get; set; }
     }
 
     public class WebSocketDocumentFilter : IDocumentFilter

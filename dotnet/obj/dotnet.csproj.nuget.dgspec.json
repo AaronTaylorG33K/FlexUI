@@ -47,6 +47,14 @@
               "target": "Package",
               "version": "[8.0.8, )"
             },
+            "Npgsql": {
+              "target": "Package",
+              "version": "[8.0.4, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[8.0.8, )"
+            },
             "Swashbuckle.AspNetCore": {
               "target": "Package",
               "version": "[6.8.0, )"

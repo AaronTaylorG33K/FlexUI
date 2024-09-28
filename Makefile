@@ -16,7 +16,7 @@ SERVICES_FILE = services.yaml
 
 # Define port forwarding ports
 PORT_DOTNET = 8080
-PORT_POSTGRES = 5432
+PORT_POSTGRES = 8081
 PORT_REMIX = 3000
 
 # Define paths to SQL files
@@ -159,7 +159,7 @@ init: build push deploy init-db port-forward
 	@echo "Run \033[0;32mmake tail-logs\033[0m to view live logs"
 
 #port-forward-postgres
-init-local: ensure-registry create-namespace build-postgres push deploy-postgres init-db
+init-local: ensure-registry create-namespace build-postgres push deploy-postgres init-db port-forward-postgres
 	@echo "💪 PostgreSQL initialized in Kubernetes. Use your local environment for .NET and Remix."
 
 	

@@ -65,3 +65,8 @@
 /Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/obj/Debug/net8.0/dotnet.pdb
 /Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/obj/Debug/net8.0/dotnet.genruntimeconfig.cache
 /Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/obj/Debug/net8.0/ref/dotnet.dll
+/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.dll
+/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Abstractions.dll
+/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/bin/Debug/net8.0/Microsoft.EntityFrameworkCore.Relational.dll
+/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/bin/Debug/net8.0/Npgsql.dll
+/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/bin/Debug/net8.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll
