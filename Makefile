@@ -158,11 +158,34 @@ init: build push deploy init-db port-forward
 	@echo "💪 FlexUI started. Lets goooo!!!"
 	@echo "Run \033[0;32mmake tail-logs\033[0m to view live logs"
 
+#port-forward-postgres
+init-local: ensure-registry create-namespace build-postgres push deploy-postgres init-db
+	@echo "💪 PostgreSQL initialized in Kubernetes. Use your local environment for .NET and Remix."
+
+	
+
+# Deploy only PostgreSQL to Kubernetes
+deploy-postgres:
+	@echo "Applying PostgreSQL deployment..."
+	kubectl apply -f $(DEPLOYMENTS_FILE) -n $(NAMESPACE) -l app=postgres
+	@echo "Applying PostgreSQL service..."
+	kubectl apply -f $(SERVICES_FILE) -n $(NAMESPACE) -l app=postgres
+	@echo "Waiting for PostgreSQL pod to be ready 2..."
+    kubectl wait --for=condition=available --timeout=60s deployment/postgres -n $(NAMESPACE)
+
+# Port forward PostgreSQL service
+port-forward-postgres:
+	@echo "Port forwarding PostgreSQL..."
+	kubectl port-forward service/postgres $(PORT_POSTGRES):5432 -n $(NAMESPACE) &
+
+
 # Wait for PostgreSQL pod to be ready
 wait-for-postgres:
-	@echo "Waiting for PostgreSQL pod to be ready..."
+	@echo "wait-for-postgres: Waiting for PostgreSQL pod to be ready..."
 	@kubectl wait --for=condition=Ready pod -l app=postgres -n $(NAMESPACE) --timeout=120s
 	@sleep 5
+
+
 
 # Run schema SQL script
 run-schema: wait-for-postgres

@@ -4,6 +4,8 @@ kind: PersistentVolume
 metadata:
   name: postgres-pv
   namespace: flexui
+  labels:
+    app: postgres
 spec:
   capacity:
     storage: 1Gi
@@ -19,6 +21,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
   namespace: flexui
+  labels:
+    app: postgres
 spec:
   accessModes:
     - ReadWriteOnce
@@ -33,6 +37,8 @@ kind: Deployment
 metadata:
   name: postgres
   namespace: flexui
+  labels:
+    app: postgres
 spec:
   replicas: 1
   selector:

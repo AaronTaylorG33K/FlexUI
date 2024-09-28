@@ -46,5 +46,5 @@ app.MapGet("/components", (FlexUIService flexUI) => flexUI.GetComponents())
    .WithName("GetComponents")
    .WithTags("Components");
 
-
-app.Run("http://+:80");
+var port = builder.Environment.IsDevelopment() ? "5555" : "80";
+app.Run($"http://+:{port}");

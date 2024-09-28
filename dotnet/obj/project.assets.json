@@ -487,11 +487,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/aarontaylor/Documents/GitHub/dotNetRemix/dotnet/dotnet.csproj",
+      "projectUniqueName": "/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/dotnet.csproj",
       "projectName": "dotnet",
-      "projectPath": "/Users/aarontaylor/Documents/GitHub/dotNetRemix/dotnet/dotnet.csproj",
+      "projectPath": "/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/dotnet.csproj",
       "packagesPath": "/Users/aarontaylor/.nuget/packages/",
-      "outputPath": "/Users/aarontaylor/Documents/GitHub/dotNetRemix/dotnet/obj/",
+      "outputPath": "/Users/aarontaylor/Documents/GitHub/FlexUI/dotnet/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/Users/aarontaylor/.nuget/NuGet/NuGet.Config"
