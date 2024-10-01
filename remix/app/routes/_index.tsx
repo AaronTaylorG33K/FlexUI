@@ -43,6 +43,18 @@ export const meta: MetaFunction = () => {
   ];
 };
 
+const getBackgroundColorClass = (color: string | undefined) => {
+  switch (color) {
+    case "blue":
+      return "bg-blue-500 hover:bg-blue-600 text-white border border-blue-600/20";
+    case "gray":
+      return "bg-gray-500 hover:bg-gray-600 text-white border border-gray-600/20";
+    // Add more colors as needed
+    default:
+      return "bg-gray-100 text-black hover:bg-gray-300 border border-white/20";
+  }
+};
+
 export default function Index() {
   const [pages, setPages] = useState<Page[]>([]);
   const ws = useRef<WebSocket | null>(null);
@@ -268,16 +280,22 @@ export default function Index() {
                               draggableId={`${page.id}-${component.id}`}
                               index={index}
                             >
-                              {(provided) => (
-                                <li
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  className="text-xs p-1 font-thin cursor-pointer hover:underline hover:bg-white/20 border border-white/20"
-                                >
-                                  ⚙️ {component.name}
-                                </li>
-                              )}
+                              {(provided) => {
+                                const backgroundColorClass =
+                                  getBackgroundColorClass(
+                                    component?.settings.background_color
+                                  );
+                                return (
+                                  <li
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className={`text-xs p-1 font-thin cursor-pointer ${backgroundColorClass}`}
+                                  >
+                                    ⚙️ {component.name}
+                                  </li>
+                                );
+                              }}
                             </Draggable>
                           ))}
                         {provided.placeholder}
