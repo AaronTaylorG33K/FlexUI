@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -13,10 +14,19 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 public class Page
 {
-    public int Id { get; set; }
-    public string Title { get; set; }
-    public string Slug { get; set; }
-    public string Content { get; set; }
+    public int id { get; set; }
+    public string title { get; set; }
+    public string slug { get; set; }
+    public string content { get; set; }
+    public List<Component> components { get; set; }
+}
+
+public class Component
+{
+    public int id { get; set; }
+    public string name { get; set; }
+    public string settings { get; set; } // Assuming settings is stored as JSON string
+    public int ordinal { get; set; }
 }
 
 namespace FlexUI.Services
@@ -31,65 +41,44 @@ namespace FlexUI.Services
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        public async Task<IEnumerable<Page>> GetPages()
+        public async Task<object> GetAllData()
         {
-            var pages = new List<Page>();
-
             using (var connection = new NpgsqlConnection(_connectionString))
             {
                 await connection.OpenAsync();
 
-                using (var command = new NpgsqlCommand("SELECT id, title, slug, content FROM pages", connection))
+                using (var command = new NpgsqlCommand(@"
+                    SELECT jsonb_build_object(
+                        'pages', jsonb_agg(
+                            jsonb_build_object(
+                                'id', p.id,
+                                'title', p.title,
+                                'slug', p.slug,
+                                'content', p.content,
+                                'components', (
+                                    SELECT jsonb_agg(
+                                        jsonb_build_object(
+                                            'component_id', c.id,
+                                            'id', pc.id,
+                                            'name', c.name,
+                                            'settings', c.settings,
+                                            'ordinal', pc.ordinal
+                                        )
+                                    )
+                                    FROM page_components pc
+                                    JOIN components c ON pc.component_id = c.id
+                                    WHERE pc.page_id = p.id
+                                )
+                            )
+                        )
+                    ) AS data
+                    FROM pages p;
+                ", connection))
                 {
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            var page = new Page
-                            {
-                                Id = reader.GetInt32(0),
-                                Title = reader.GetString(1),
-                                Slug = reader.GetString(2),
-                                Content = reader.GetString(3)
-                            };
-                            pages.Add(page);
-                        }
-                    }
+                    var result = await command.ExecuteScalarAsync();
+                    return JsonSerializer.Deserialize<object>(result.ToString());
                 }
             }
-
-            return pages;
-        }
-
-        public async Task<IEnumerable<Component>> GetComponents()
-        {
-            var components = new List<Component>();
-
-            using (var connection = new NpgsqlConnection(_connectionString))
-            {
-                await connection.OpenAsync();
-
-                using (var command = new NpgsqlCommand("SELECT id, page_id, name, settings, ordinal FROM components", connection))
-                {
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            var component = new Component
-                            {
-                                Id = reader.GetInt32(0),
-                                PageId = reader.GetInt32(1),
-                                Name = reader.GetString(2),
-                                Settings = reader.GetString(3),
-                                Ordinal = reader.GetInt32(4)
-                            };
-                            components.Add(component);
-                        }
-                    }
-                }
-            }
-
-            return components;
         }
 
         public async Task HandleWebSocketAsync(HttpContext context)
@@ -122,20 +111,56 @@ namespace FlexUI.Services
                         break;
                     }
 
-                    var pages = await GetPages();
-                    var components = await GetComponents();
+                    var message = Encoding.UTF8.GetString(buffer, 0, receiveResult.Count);
+                    Console.WriteLine("Received message: " + message); // Log the received message
 
-                    var responseData = new
+                    if (string.IsNullOrWhiteSpace(message))
                     {
-                        data = new
-                        {
-                            pages = pages,
-                            components = components
-                        }
-                    };
+                        Console.WriteLine("Received an empty message.");
+                        continue; // Skip processing this message
+                    }
 
-                    var message = JsonSerializer.Serialize(responseData);
-                    await BroadcastMessageAsync(message);
+                    WebSocketRequest request;
+                    try
+                    {
+                        request = JsonSerializer.Deserialize<WebSocketRequest>(message);
+                    }
+                    catch (JsonException ex)
+                    {
+                        Console.WriteLine($"JSON deserialization error: {ex.Message}");
+                        continue; // Skip processing this message
+                    }
+
+                    if (request.Mutations != null && request.Mutations.Count > 0)
+                    {
+                        Console.WriteLine("Processing mutations:");
+                        foreach (var mutation in request.Mutations)
+                        {
+                            Console.WriteLine($"Mutation: Type={mutation.Type}, NewOrdinal={mutation.NewOrdinal}, DestinationPageID={mutation.DestinationPageID}, PageComponentID={mutation.PageComponentID}");
+                        }
+
+                        await ProcessMutationsAsync(request.Mutations);
+
+                        // Fetch the updated data
+                        var data = await GetAllData();
+                        var responseData = new { data = data };
+                        var responseMessage = JsonSerializer.Serialize(responseData);
+
+                        Console.WriteLine("Sending updated response: " + responseMessage); // Log the response message
+                        await BroadcastMessageAsync(responseMessage);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Did not find any mutations, sending whole dataset");
+
+                        // Fetch the data
+                        var data = await GetAllData();
+                        var responseData = new { data = data };
+                        var responseMessage = JsonSerializer.Serialize(responseData);
+
+                        Console.WriteLine("Sending response: " + responseMessage); // Log the response message
+                        await BroadcastMessageAsync(responseMessage);
+                    }
                 }
             }
             catch (WebSocketException ex)
@@ -164,6 +189,62 @@ namespace FlexUI.Services
             }
         }
 
+        private async Task ProcessMutationsAsync(List<Mutation> mutations)
+        {
+            using (var connection = new NpgsqlConnection(_connectionString))
+            {
+                await connection.OpenAsync();
+
+                using (var transaction = await connection.BeginTransactionAsync())
+                {
+                    foreach (var mutation in mutations)
+                    {
+                        using (var command = new NpgsqlCommand())
+                        {
+                            command.Connection = connection;
+                            command.Transaction = transaction;
+
+                            if (mutation.Type == "ordinalUpdate")
+                            {
+                                command.CommandText = @"
+                                    UPDATE page_components
+                                    SET 
+                                        ordinal = @newOrdinal
+                                    WHERE id = @pageComponentID;
+                                ";
+                                command.Parameters.AddWithValue("@newOrdinal", mutation.NewOrdinal);
+                                command.Parameters.AddWithValue("@pageComponentID", mutation.PageComponentID);
+
+                                Console.WriteLine($"Executing ordinal update: UPDATE page_components SET ordinal = {mutation.NewOrdinal} WHERE id = {mutation.PageComponentID} - {mutation.ComponentName}");
+                            }
+                            else if (mutation.Type == "pageMove")
+                            {
+                                command.CommandText = @"
+                                    UPDATE page_components
+                                    SET 
+                                        page_id = @destinationPageID
+                                    WHERE id = @pageComponentID;
+                                ";
+                                command.Parameters.AddWithValue("@destinationPageID", mutation.DestinationPageID);
+                                command.Parameters.AddWithValue("@pageComponentID", mutation.PageComponentID);
+
+                                Console.WriteLine($"Executing page move: UPDATE page_components SET page_id = {mutation.DestinationPageID} WHERE id = {mutation.PageComponentID} - {mutation.ComponentName}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"Unknown mutation type: {mutation.Type}");
+                                continue; // Skip unknown mutation types
+                            }
+
+                            await command.ExecuteNonQueryAsync();
+                        }
+                    }
+
+                    await transaction.CommitAsync();
+                }
+            }
+        }
+
         private async Task BroadcastMessageAsync(string message)
         {
             var sendBuffer = Encoding.UTF8.GetBytes(message);
@@ -181,13 +262,28 @@ namespace FlexUI.Services
         }
     }
 
-    public class Component
+    public class WebSocketRequest
     {
-        public int Id { get; set; }
-        public int PageId { get; set; }
-        public string Name { get; set; }
-        public string Settings { get; set; }
-        public int Ordinal { get; set; }
+        [JsonPropertyName("mutations")]
+        public List<Mutation> Mutations { get; set; }
+    }
+
+    public class Mutation
+    {
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+
+        [JsonPropertyName("newOrdinal")]
+        public int NewOrdinal { get; set; }
+
+        [JsonPropertyName("destinationPageID")]
+        public int DestinationPageID { get; set; }
+
+        [JsonPropertyName("pageComponentID")]
+        public int PageComponentID { get; set; }
+
+        [JsonPropertyName("componentName")]
+        public string ComponentName { get; set; }
     }
 
     public class WebSocketDocumentFilter : IDocumentFilter

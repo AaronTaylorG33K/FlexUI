@@ -37,14 +37,7 @@ app.Use(async (context, next) =>
     }
 });
 
-// couple classic http endpoints for REST API testing
-app.MapGet("/pages", (FlexUIService flexUI) => flexUI.GetPages())
-   .WithName("GetPages")
-   .WithTags("Pages");
 
-app.MapGet("/components", (FlexUIService flexUI) => flexUI.GetComponents())
-   .WithName("GetComponents")
-   .WithTags("Components");
 
 var port = builder.Environment.IsDevelopment() ? "5555" : "80";
 app.Run($"http://+:{port}");
