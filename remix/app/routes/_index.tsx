@@ -60,7 +60,8 @@ export default function Index() {
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    ws.current = new WebSocket("ws://localhost:5555/ws");
+    // change this port to 5555 for local dev mode
+    ws.current = new WebSocket("ws://localhost:8080/ws");
 
     ws.current.onopen = () => {
       const message: Message = {
