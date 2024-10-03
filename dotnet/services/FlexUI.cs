@@ -1,33 +1,15 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using FlexUI.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
-using Microsoft.OpenApi.Models;
 using Npgsql;
-using Swashbuckle.AspNetCore.SwaggerGen;
-
-public class Page
-{
-    public int id { get; set; }
-    public string title { get; set; }
-    public string slug { get; set; }
-    public string content { get; set; }
-    public List<Component> components { get; set; }
-}
-
-public class Component
-{
-    public int id { get; set; }
-    public string name { get; set; }
-    public string settings { get; set; } // Assuming settings is stored as JSON string
-    public int ordinal { get; set; }
-}
 
 namespace FlexUI.Services
 {
@@ -38,7 +20,7 @@ namespace FlexUI.Services
 
         public FlexUI(IConfiguration configuration)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection");
+            _connectionString = configuration.GetConnectionString("DefaultConnection") ?? throw new ArgumentNullException(nameof(configuration), "Connection string cannot be null");
         }
 
         public async Task<object> GetAllData()
@@ -76,7 +58,7 @@ namespace FlexUI.Services
                 ", connection))
                 {
                     var result = await command.ExecuteScalarAsync();
-                    return JsonSerializer.Deserialize<object>(result.ToString());
+                    return JsonSerializer.Deserialize<object>(result?.ToString() ?? string.Empty);
                 }
             }
         }
@@ -259,53 +241,6 @@ namespace FlexUI.Services
             }
 
             await Task.WhenAll(tasks);
-        }
-    }
-
-    public class WebSocketRequest
-    {
-        [JsonPropertyName("mutations")]
-        public List<Mutation> Mutations { get; set; }
-    }
-
-    public class Mutation
-    {
-        [JsonPropertyName("type")]
-        public string Type { get; set; }
-
-        [JsonPropertyName("newOrdinal")]
-        public int NewOrdinal { get; set; }
-
-        [JsonPropertyName("destinationPageID")]
-        public int DestinationPageID { get; set; }
-
-        [JsonPropertyName("pageComponentID")]
-        public int PageComponentID { get; set; }
-
-        [JsonPropertyName("componentName")]
-        public string ComponentName { get; set; }
-    }
-
-    public class WebSocketDocumentFilter : IDocumentFilter
-    {
-        public void Apply(OpenApiDocument swaggerDoc, DocumentFilterContext context)
-        {
-            swaggerDoc.Paths.Add("/ws", new OpenApiPathItem
-            {
-                Operations = new Dictionary<OperationType, OpenApiOperation>
-                {
-                    [OperationType.Get] = new OpenApiOperation
-                    {
-                        Summary = "WebSocket endpoint - ws:// protocol",
-                        Description = "Endpoint for WebSocket connections. Access via ws:// protocol.",
-                        Tags = new List<OpenApiTag> { new OpenApiTag { Name = "WebSocket" } },
-                        Responses = new OpenApiResponses
-                        {
-                            ["101"] = new OpenApiResponse { Description = "Switching Protocols" }
-                        }
-                    }
-                }
-            });
         }
     }
 }

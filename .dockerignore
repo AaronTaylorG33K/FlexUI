@@ -1,6 +1,0 @@
-bin/
-obj/
-*.md
-*.sln
-dotnet/bin/
-dotnet/obj/

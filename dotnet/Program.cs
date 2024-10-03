@@ -1,6 +1,7 @@
 using Microsoft.OpenApi.Models;
 using FlexUIService = FlexUI.Services.FlexUI;
 using FlexUI.Services;
+using FlexUI.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 

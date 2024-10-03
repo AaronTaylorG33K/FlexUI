@@ -70,6 +70,13 @@ push: ensure-registry create-namespace
 	docker push $(REGISTRY)/$(IMAGE_NAME_REMIX):$(TAG)
 	docker push $(REGISTRY)/$(IMAGE_NAME_POSTGRES):$(TAG)
 
+# Tag and push all Docker images
+push-postgres: ensure-registry create-namespace
+	@echo "Waiting for registry to be fully up..."
+	@echo "Tagging and pushing Docker images..."
+	docker tag $(IMAGE_NAME_POSTGRES):$(TAG) $(REGISTRY)/$(IMAGE_NAME_POSTGRES):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE_NAME_POSTGRES):$(TAG)
+
 # Deploy to Kubernetes
 deploy:
 	@echo "Applying Kubernetes deployments..."
@@ -159,7 +166,7 @@ init: build push deploy init-db port-forward
 	@echo "Run \033[0;32mmake tail-logs\033[0m to view live logs"
 
 #port-forward-postgres
-init-local: ensure-registry create-namespace build-postgres push deploy-postgres init-db port-forward-postgres
+init-local: ensure-registry create-namespace build-postgres push-postgres deploy-postgres init-db port-forward-postgres
 	@echo "💪 PostgreSQL initialized in Kubernetes. Use your local environment for .NET and Remix."
 
 	
