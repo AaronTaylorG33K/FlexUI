@@ -5,11 +5,9 @@ import { ComponentListItem } from "./ComponentListItem";
 import { PageListItem } from "./PageListItem";
 import { useWebSocket } from "../../util/websocket";
 
-
 export default function FlexUI() {
   const [pages, setPages] = useState<Page[]>([]);
   const ws = useWebSocket(setPages);
-
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
@@ -23,8 +21,12 @@ export default function FlexUI() {
       return;
     }
 
-    const sourcePageIndex = pages.findIndex((page) => page.id.toString() === source.droppableId);
-    const destinationPageIndex = pages.findIndex((page) => page.id.toString() === destination.droppableId);
+    const sourcePageIndex = pages.findIndex(
+      (page) => page.id.toString() === source.droppableId
+    );
+    const destinationPageIndex = pages.findIndex(
+      (page) => page.id.toString() === destination.droppableId
+    );
 
     const sourcePage = pages[sourcePageIndex];
     const destinationPage = pages[destinationPageIndex];
@@ -102,7 +104,7 @@ export default function FlexUI() {
   };
 
   return (
-    <>        
+    <>
       <div className="flex flex-row w-full max-w-screen-lg items-start gap-1 mx-auto bg-gray-200/20">
         <div className="w-1/2 p-4">
           <h1 className="text-2xl">Components</h1>
@@ -121,22 +123,25 @@ export default function FlexUI() {
                   )
                 )
               )
-                .sort((a, b) => a - b) // Sort by component_id
-                .map((component_id) => {
-                  const component = pages
+                .map((component_id) =>
+                  pages
                     .flatMap((page) => page.components)
-                    .find((c) => c.component_id === component_id);
+                    .find((c) => c.component_id === component_id)
+                )
+                .filter((component) => component !== undefined)
+                .sort((a, b) => a!.name.localeCompare(b!.name)) 
+                .map((component) => {
                   const componentPages = pages
                     .filter((page) =>
                       page.components.some(
-                        (c) => c.component_id === component_id
+                        (c) => c.component_id === component!.component_id
                       )
                     )
                     .map((page) => page.title);
                   return (
                     <ComponentListItem
-                      key={component_id}
-                      component={component}
+                      key={component!.component_id}
+                      component={component!}
                       componentPages={componentPages}
                     />
                   );
