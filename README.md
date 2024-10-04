@@ -2,9 +2,8 @@
 
 FlexUI is a project comprised of Postgres, .NET 8.0 and Remix. It communicates over WebSockets and is setup to run on a scalable Kubernetes cluster and can be centrally controlled using Make commands.
 
+![Screenshot 2024-10-04 at 2 13 14 PM](https://github.com/user-attachments/assets/e0130016-919a-4e2f-affe-9d0732301448)
 
-
-![Screenshot 2024-09-30 at 8 25 27 PM](https://github.com/user-attachments/assets/870c0a66-ee7d-48fe-9e12-c5b19aab51ed)
 
 
 **Prerequisites**
