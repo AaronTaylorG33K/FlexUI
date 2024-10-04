@@ -7,7 +7,7 @@ export const useWebSocket = (setPages: Dispatch<SetStateAction<Page[]>>) => {
 
   useEffect(() => {
     // change this port to 5555 for local dev mode, 8080 for builds
-    ws.current = new WebSocket("ws://localhost:5555/ws");
+    ws.current = new WebSocket("ws://localhost:5000/ws");
 
     ws.current.onopen = () => {
       const message: Message = {

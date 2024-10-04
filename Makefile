@@ -15,7 +15,7 @@ DEPLOYMENTS_FILE = deployments.yaml
 SERVICES_FILE = services.yaml
 
 # Define port forwarding ports
-PORT_DOTNET = 8080
+PORT_DOTNET = 5000
 PORT_POSTGRES = 8081
 PORT_REMIX = 3000
 
@@ -92,7 +92,7 @@ deploy:
 port-forward:
 	@echo "Namespace: $(NAMESPACE)"
 	@echo "Port forwarding .NET..."
-	kubectl port-forward service/dotnet $(PORT_DOTNET):80 -n $(NAMESPACE) &
+	kubectl port-forward service/dotnet $(PORT_DOTNET):5000 -n $(NAMESPACE) &
 	@echo "Port forwarding Remix..."
 	kubectl port-forward service/remix $(PORT_REMIX):3000 -n $(NAMESPACE) &
 

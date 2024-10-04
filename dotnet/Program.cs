@@ -5,7 +5,14 @@ using FlexUI.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel to listen on a specific port
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(5000); // Replace 5000 with your desired port
+});
+
 builder.Services.AddSingleton<FlexUIService>();
+builder.Services.AddSingleton<WebSocketService>(); // Register WebSocketService
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -29,8 +36,8 @@ app.Use(async (context, next) =>
 {
     if (context.Request.Path == "/ws")
     {
-        var flexUI = context.RequestServices.GetRequiredService<FlexUIService>();
-        await flexUI.HandleWebSocketAsync(context);
+        var webSocketService = context.RequestServices.GetRequiredService<WebSocketService>();
+        await webSocketService.HandleWebSocketAsync(context);
     }
     else
     {
@@ -38,7 +45,4 @@ app.Use(async (context, next) =>
     }
 });
 
-
-
-var port = builder.Environment.IsDevelopment() ? "5555" : "80";
-app.Run($"http://+:{port}");
+app.Run();

@@ -97,7 +97,7 @@ spec:
       - name: dotnet
         image: localhost:6000/dotnet:latest
         ports:
-        - containerPort: 80
+        - containerPort: 5000
         env:
         - name: ConnectionStrings__DefaultConnection
           value: "Host=postgres;Database=mydb;Username=myuser;Password=mypassword"
