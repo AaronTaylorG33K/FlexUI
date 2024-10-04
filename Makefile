@@ -1,6 +1,7 @@
 IMAGE_NAME_DOTNET = dotnet
 IMAGE_NAME_REMIX = remix
 IMAGE_NAME_POSTGRES = postgres
+IMAGE_NAME_SQLSERVER = sqlserver
 TAG = latest
 REGISTRY = localhost:6000
 NAMESPACE = flexui
@@ -9,6 +10,7 @@ NAMESPACE = flexui
 DOTNET_DOCKERFILE = dotnet/Dockerfile
 REMIX_DOCKERFILE = remix/Dockerfile
 POSTGRES_DOCKERFILE = postgres/Dockerfile
+SQLSERVER_DOCKERFILE = sqlserver/Dockerfile
 
 # Define path to Kubernetes deployments and services files
 DEPLOYMENTS_FILE = deployments.yaml
@@ -18,23 +20,22 @@ SERVICES_FILE = services.yaml
 PORT_DOTNET = 5000
 PORT_POSTGRES = 8081
 PORT_REMIX = 3000
+PORT_SQLSERVER = 1433
 
 # Define paths to SQL files
 SCHEMA_FILE := ./postgres/scripts/schema.sql
 SEED_FILE := ./postgres/scripts/seeds.sql
 
-# Define PostgreSQL pod name
-POSTGRES_POD_NAME := $(shell kubectl get pods -n $(NAMESPACE) -l app=postgres -o jsonpath="{.items[0].metadata.name}")
 
 # Build all images
-build: build-dotnet build-remix build-postgres
+build: build-dotnet build-remix build-sqlserver
 	@echo "🔥 Images ready to go."
 
 # Ensure local Docker registry is running
 ensure-registry:
-	@if [ -z "$$(docker ps -q -f name=registry)" ]; then \
+	@if [ -z "$$(docker ps -q -f name=registry2)" ]; then \
     	echo "Starting local Docker registry..."; \
-    	docker run -d -p 6000:5000 --name registry registry:2; \
+    	docker run -d -p 6000:5000 --name registry2 registry:2; \
 	fi
 
 # Create the namespace if it doesn't exist
@@ -55,9 +56,10 @@ build-remix:
 	docker build -t $(IMAGE_NAME_REMIX):$(TAG) -f $(REMIX_DOCKERFILE) remix
 
 # Build the PostgreSQL Docker image
-build-postgres:
+build-sqlserver:
 	@echo "Building PostgreSQL Docker image..."
-	docker build -t $(IMAGE_NAME_POSTGRES):$(TAG) -f $(POSTGRES_DOCKERFILE) postgres
+	docker build -t $(IMAGE_NAME_SQLSERVER):$(TAG) -f $(SQLSERVER_DOCKERFILE) sqlserver
+
 
 # Tag and push all Docker images
 push: ensure-registry create-namespace
@@ -65,17 +67,17 @@ push: ensure-registry create-namespace
 	@echo "Tagging and pushing Docker images..."
 	docker tag $(IMAGE_NAME_DOTNET):$(TAG) $(REGISTRY)/$(IMAGE_NAME_DOTNET):$(TAG)
 	docker tag $(IMAGE_NAME_REMIX):$(TAG) $(REGISTRY)/$(IMAGE_NAME_REMIX):$(TAG)
-	docker tag $(IMAGE_NAME_POSTGRES):$(TAG) $(REGISTRY)/$(IMAGE_NAME_POSTGRES):$(TAG)
+	docker tag $(IMAGE_NAME_SQLSERVER):$(TAG) $(REGISTRY)/$(IMAGE_NAME_SQLSERVER):$(TAG)
 	docker push $(REGISTRY)/$(IMAGE_NAME_DOTNET):$(TAG)
 	docker push $(REGISTRY)/$(IMAGE_NAME_REMIX):$(TAG)
-	docker push $(REGISTRY)/$(IMAGE_NAME_POSTGRES):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE_NAME_SQLSERVER):$(TAG)
 
 # Tag and push all Docker images
-push-postgres: ensure-registry create-namespace
+push-sqlserver: ensure-registry create-namespace
 	@echo "Waiting for registry to be fully up..."
 	@echo "Tagging and pushing Docker images..."
-	docker tag $(IMAGE_NAME_POSTGRES):$(TAG) $(REGISTRY)/$(IMAGE_NAME_POSTGRES):$(TAG)
-	docker push $(REGISTRY)/$(IMAGE_NAME_POSTGRES):$(TAG)
+	docker tag $(IMAGE_NAME_SQLSERVER):$(TAG) $(REGISTRY)/$(IMAGE_NAME_SQLSERVER):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE_NAME_SQLSERVER):$(TAG)
 
 # Deploy to Kubernetes
 deploy:
@@ -101,7 +103,7 @@ tail-logs:
 	@echo "Tailing logs for .NET pods..."
 	kubectl logs -f -l app=dotnet -n $(NAMESPACE)
 	@echo "Tailing logs for PostgreSQL pods..."
-	kubectl logs -f -l app=postgres -n $(NAMESPACE)
+	kubectl logs -f -l app=sqlserver -n $(NAMESPACE)
 	@echo "Tailing logs for Remix pods..."
 	kubectl logs -f -l app=remix -n $(NAMESPACE)
 
@@ -110,7 +112,7 @@ stop:
 	@echo "Scaling down deployments..."
 	kubectl scale deployment dotnet --replicas=0 -n $(NAMESPACE)
 	kubectl scale deployment remix --replicas=0 -n $(NAMESPACE)
-	kubectl scale deployment postgres --replicas=0 -n $(NAMESPACE)
+	kubectl scale deployment sqlserver --replicas=0 -n $(NAMESPACE)
 	@echo "Stopping port forwarding..."
 	pkill -f "kubectl port-forward"
 	@echo "Stack stopped."
@@ -130,7 +132,7 @@ clean-services:
 # Clean up local Docker images
 clean-images:
 	@echo "Removing local Docker images..."
-	docker rmi $(IMAGE_NAME_DOTNET):$(TAG) $(IMAGE_NAME_REMIX):$(TAG) $(IMAGE_NAME_POSTGRES):$(TAG)
+	docker rmi $(IMAGE_NAME_DOTNET):$(TAG) $(IMAGE_NAME_REMIX):$(TAG) $(IMAGE_NAME_SQLSERVER):$(TAG)
 # Clean up port forwarding
 clean-ports:
 	@echo "Cleaning up port forwarding..."
@@ -166,45 +168,45 @@ init: build push deploy init-db port-forward
 	@echo "Run \033[0;32mmake tail-logs\033[0m to view live logs"
 
 #port-forward-postgres
-init-local: ensure-registry create-namespace build-postgres push-postgres deploy-postgres init-db port-forward-postgres
+init-local: ensure-registry create-namespace build-postgres push-sqlserver deploy-postgres init-db port-forward-postgres
 	@echo "💪 PostgreSQL initialized in Kubernetes. Use your local environment for .NET and Remix."
 
 	
 
 # Deploy only PostgreSQL to Kubernetes
-deploy-postgres:
+deploy-sqlserver:
 	@echo "Applying PostgreSQL deployment..."
-	kubectl apply -f $(DEPLOYMENTS_FILE) -n $(NAMESPACE) -l app=postgres
+	kubectl apply -f $(DEPLOYMENTS_FILE) -n $(NAMESPACE) -l app=sqlserver
 	@echo "Applying PostgreSQL service..."
-	kubectl apply -f $(SERVICES_FILE) -n $(NAMESPACE) -l app=postgres
+	kubectl apply -f $(SERVICES_FILE) -n $(NAMESPACE) -l app=sqlserver
 	@echo "Waiting for PostgreSQL pod to be ready 2..."
-    kubectl wait --for=condition=available --timeout=60s deployment/postgres -n $(NAMESPACE)
+    kubectl wait --for=condition=available --timeout=60s deployment/sqlserver -n $(NAMESPACE)
 
 # Port forward PostgreSQL service
-port-forward-postgres:
+port-forward-sqlserver:
 	@echo "Port forwarding PostgreSQL..."
-	kubectl port-forward service/postgres $(PORT_POSTGRES):5432 -n $(NAMESPACE) &
+	kubectl port-forward service/sqlserver $(PORT_POSTGRES):1433 -n $(NAMESPACE) &
 
 
 # Wait for PostgreSQL pod to be ready
-wait-for-postgres:
-	@echo "wait-for-postgres: Waiting for PostgreSQL pod to be ready..."
-	@kubectl wait --for=condition=Ready pod -l app=postgres -n $(NAMESPACE) --timeout=120s
+wait-for-sqlserver:
+	@echo "wait-for-sqlserver: Waiting for SQL Server pod to be ready..."
+	@kubectl wait --for=condition=Ready pod -l app=sqlserver -n $(NAMESPACE) --timeout=120s
 	@sleep 5
 
 
 
 # Run schema SQL script
-run-schema: wait-for-postgres
+run-schema: wait-for-sqlserver
 	@echo "Running schema SQL script..."
-	@POSTGRES_POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l app=postgres -o jsonpath="{.items[0].metadata.name}") && \
-	kubectl exec -i $$POSTGRES_POD_NAME -n $(NAMESPACE) -- psql -U myuser -d mydb -f /docker-entrypoint-initdb.d/schema.sql
+	@SQLSERVER_POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l app=sqlserver -o jsonpath="{.items[0].metadata.name}") && \
+	kubectl exec -i $$SQLSERVER_POD_NAME -n $(NAMESPACE) -- /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/schema.sql
 
 # Run seed SQL script
-run-seed: wait-for-postgres
+run-seed: wait-for-sqlserver
 	@echo "Running seed SQL script..."
-	@POSTGRES_POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l app=postgres -o jsonpath="{.items[0].metadata.name}") && \
-	kubectl exec -i $$POSTGRES_POD_NAME -n $(NAMESPACE) -- psql -U myuser -d mydb -f /docker-entrypoint-initdb.d/seeds.sql
+	@SQLSERVER_POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l app=sqlserver -o jsonpath="{.items[0].metadata.name}") && \
+	kubectl exec -i $$SQLSERVER_POD_NAME -n $(NAMESPACE) -- /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/seeds.sql
 
 # Initialize the database
 init-db: run-schema run-seed

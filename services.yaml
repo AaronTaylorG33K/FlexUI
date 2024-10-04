@@ -1,17 +1,17 @@
-# Service for PostgreSQL
+# Service for SQL Server
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres
+  name: sqlserver
   namespace: flexui
   labels:
-    app: postgres
+    app: sqlserver
 spec:
   ports:
-  - port: 5432
-    targetPort: 5432
+  - port: 1433
+    targetPort: 1433
   selector:
-    app: postgres
+    app: sqlserver
 
 ---
 # Service for .NET application

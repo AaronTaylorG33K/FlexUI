@@ -1,69 +1,69 @@
-# PersistentVolume for PostgreSQL
+# PersistentVolume for SQL Server
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: postgres-pv
-  namespace: flexui
+  name: sqlserver-pv
   labels:
-    app: postgres
+    app: sqlserver
 spec:
   capacity:
     storage: 1Gi
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: "/mnt/data/postgres"
+    path: "/mnt/data/sqlserver"
+  storageClassName: hostpath
+  persistentVolumeReclaimPolicy: Retain
 
 ---
-# PersistentVolumeClaim for PostgreSQL
+# PersistentVolumeClaim for SQL Server
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-pvc
+  name: sqlserver-pvc
   namespace: flexui
   labels:
-    app: postgres
+    app: sqlserver
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi
+  storageClassName: hostpath
 
 ---
-# Deployment for PostgreSQL
+# Deployment for SQL Server
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres
+  name: sqlserver
   namespace: flexui
   labels:
-    app: postgres
+    app: sqlserver
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
+      app: sqlserver
   template:
     metadata:
       labels:
-        app: postgres
+        app: sqlserver
     spec:
       containers:
-      - name: postgres
-        image: localhost:6000/postgres:latest
+      - name: sqlserver
+        image: mcr.microsoft.com/mssql/server:latest
         env:
-        - name: POSTGRES_USER
-          value: "myuser"
-        - name: POSTGRES_PASSWORD
-          value: "mypassword"
-        - name: POSTGRES_DB
-          value: "mydb"
+        - name: SA_PASSWORD
+          value: "YourStrong!Passw0rd"
+        - name: ACCEPT_EULA
+          value: "Y"
         ports:
-        - containerPort: 5432
+        - containerPort: 1433
         volumeMounts:
-        - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
+        - name: sqlserver-storage
+          mountPath: /var/opt/mssql
         resources:
           requests:
             memory: "512Mi"
@@ -72,10 +72,9 @@ spec:
             memory: "1Gi"
             cpu: "1"
       volumes:
-      - name: postgres-storage
+      - name: sqlserver-storage
         persistentVolumeClaim:
-          claimName: postgres-pvc
-
+          claimName: sqlserver-pvc
 ---
 # Deployment for .NET application
 apiVersion: apps/v1
@@ -100,7 +99,7 @@ spec:
         - containerPort: 5000
         env:
         - name: ConnectionStrings__DefaultConnection
-          value: "Host=postgres;Database=mydb;Username=myuser;Password=mypassword"
+          value: "Server=sqlserver;Database=mydb;User Id=sa;Password=YourStrong!Passw0rd;"
         volumeMounts:
         - name: dotnet-storage
           mountPath: /app/data
@@ -114,7 +113,7 @@ spec:
       volumes:
       - name: dotnet-storage
         persistentVolumeClaim:
-          claimName: postgres-pvc
+          claimName: sqlserver-pvc
 
 ---
 # Deployment for Remix application
@@ -147,11 +146,11 @@ spec:
             cpu: "500m"
         env:
         - name: DATABASE_URL
-          value: "postgres://myuser:mypassword@postgres:5432/mydb"
+          value: "Server=sqlserver;Database=mydb;User Id=sa;Password=YourStrong!Passw0rd;"
         volumeMounts:
         - name: remix-storage
           mountPath: /app/data
       volumes:
       - name: remix-storage
         persistentVolumeClaim:
-          claimName: postgres-pvc
+          claimName: sqlserver-pvc
