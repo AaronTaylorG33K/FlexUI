@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
+using Microsoft.Data.SqlClient;
 using System.Text.Json;
 using System.Threading.Tasks;
 using FlexUI.Models;
 using Microsoft.Extensions.Configuration;
-using Npgsql;
 
 namespace FlexUI.Services
 {
@@ -19,36 +20,42 @@ namespace FlexUI.Services
 
         public async Task<object> GetAllData()
         {
-            using (var connection = new NpgsqlConnection(_connectionString))
+            using (var connection = new SqlConnection(_connectionString))
             {
                 await connection.OpenAsync();
 
-                using (var command = new NpgsqlCommand(@"
-                    SELECT jsonb_build_object(
-                        'pages', jsonb_agg(
-                            jsonb_build_object(
-                                'id', p.id,
-                                'title', p.title,
-                                'slug', p.slug,
-                                'content', p.content,
-                                'components', (
-                                    SELECT jsonb_agg(
-                                        jsonb_build_object(
-                                            'component_id', c.id,
-                                            'id', pc.id,
-                                            'name', c.name,
-                                            'settings', c.settings,
-                                            'ordinal', pc.ordinal
+                using (var command = new SqlCommand(@"
+                    SELECT 
+                        (SELECT 
+                            JSON_QUERY(
+                                (SELECT 
+                                    JSON_QUERY(
+                                        (SELECT 
+                                            p.id AS id,
+                                            p.title AS title,
+                                            p.slug AS slug,
+                                            p.content AS content,
+                                            (SELECT 
+                                                JSON_QUERY(
+                                                    (SELECT 
+                                                        c.id AS component_id,
+                                                        pc.id AS id,
+                                                        c.name AS name,
+                                                        c.settings AS settings,
+                                                        pc.ordinal AS ordinal
+                                                    FOR JSON PATH)
+                                                ) AS components
+                                            FROM page_components pc
+                                            JOIN components c ON pc.component_id = c.id
+                                            WHERE pc.page_id = p.id
+                                            FOR JSON PATH
                                         )
-                                    )
-                                    FROM page_components pc
-                                    JOIN components c ON pc.component_id = c.id
-                                    WHERE pc.page_id = p.id
+                                    FOR JSON PATH)
                                 )
-                            )
-                        )
-                    ) AS data
-                    FROM pages p;
+                            ) AS pages
+                        FROM pages p
+                        FOR JSON PATH
+                    ) AS data;
                 ", connection))
                 {
                     var result = await command.ExecuteScalarAsync();
@@ -59,7 +66,7 @@ namespace FlexUI.Services
 
         public async Task ProcessMutationsAsync(List<Mutation> mutations)
         {
-            using (var connection = new NpgsqlConnection(_connectionString))
+            using (var connection = new SqlConnection(_connectionString))
             {
                 await connection.OpenAsync();
 
@@ -67,10 +74,10 @@ namespace FlexUI.Services
                 {
                     foreach (var mutation in mutations)
                     {
-                        using (var command = new NpgsqlCommand())
+                        using (var command = new SqlCommand())
                         {
                             command.Connection = connection;
-                            command.Transaction = transaction;
+                            command.Transaction = (SqlTransaction)transaction;
 
                             if (mutation.Type == "ordinalUpdate")
                             {

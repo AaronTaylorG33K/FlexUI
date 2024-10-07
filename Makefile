@@ -192,7 +192,7 @@ port-forward-sqlserver:
 wait-for-sqlserver:
 	@echo "wait-for-sqlserver: Waiting for SQL Server pod to be ready..."
 	@kubectl wait --for=condition=Ready pod -l app=sqlserver -n $(NAMESPACE) --timeout=120s
-	@sleep 5
+	@sleep 20
 
 
 
