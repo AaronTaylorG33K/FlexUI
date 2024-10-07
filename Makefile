@@ -200,13 +200,13 @@ wait-for-sqlserver:
 run-schema: wait-for-sqlserver
 	@echo "Running schema SQL script..."
 	@SQLSERVER_POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l app=sqlserver -o jsonpath="{.items[0].metadata.name}") && \
-	kubectl exec -i $$SQLSERVER_POD_NAME -n $(NAMESPACE) -- /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/schema.sql
+	kubectl exec -i $$SQLSERVER_POD_NAME -n $(NAMESPACE) -- /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/schema.sql -C
 
 # Run seed SQL script
 run-seed: wait-for-sqlserver
 	@echo "Running seed SQL script..."
 	@SQLSERVER_POD_NAME=$$(kubectl get pods -n $(NAMESPACE) -l app=sqlserver -o jsonpath="{.items[0].metadata.name}") && \
-	kubectl exec -i $$SQLSERVER_POD_NAME -n $(NAMESPACE) -- /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/seeds.sql
+	kubectl exec -i $$SQLSERVER_POD_NAME -n $(NAMESPACE) -- /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/seeds.sql -C
 
 # Initialize the database
 init-db: run-schema run-seed

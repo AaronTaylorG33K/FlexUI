@@ -1,39 +1,3 @@
-# PersistentVolume for SQL Server
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: sqlserver-pv
-  labels:
-    app: sqlserver
-spec:
-  capacity:
-    storage: 1Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/mnt/data/sqlserver"
-  storageClassName: hostpath
-  persistentVolumeReclaimPolicy: Retain
-
----
-# PersistentVolumeClaim for SQL Server
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: sqlserver-pvc
-  namespace: flexui
-  labels:
-    app: sqlserver
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: hostpath
-
----
-# Deployment for SQL Server
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -53,7 +17,7 @@ spec:
     spec:
       containers:
       - name: sqlserver
-        image: mcr.microsoft.com/mssql/server:latest
+        image: localhost:6000/sqlserver:latest
         env:
         - name: SA_PASSWORD
           value: "YourStrong!Passw0rd"
@@ -62,19 +26,22 @@ spec:
         ports:
         - containerPort: 1433
         volumeMounts:
-        - name: sqlserver-storage
-          mountPath: /var/opt/mssql
+        - name: mssql-system
+          mountPath: /.system
+        - name: mssql-log
+          mountPath: /log
         resources:
           requests:
-            memory: "512Mi"
+            memory: "1Gi"
             cpu: "500m"
           limits:
-            memory: "1Gi"
+            memory: "2Gi"
             cpu: "1"
       volumes:
-      - name: sqlserver-storage
-        persistentVolumeClaim:
-          claimName: sqlserver-pvc
+      - name: mssql-system
+        emptyDir: {}
+      - name: mssql-log
+        emptyDir: {}
 ---
 # Deployment for .NET application
 apiVersion: apps/v1
@@ -100,9 +67,6 @@ spec:
         env:
         - name: ConnectionStrings__DefaultConnection
           value: "Server=sqlserver;Database=mydb;User Id=sa;Password=YourStrong!Passw0rd;"
-        volumeMounts:
-        - name: dotnet-storage
-          mountPath: /app/data
         resources:
           requests:
             memory: "512Mi"
@@ -110,10 +74,6 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "1"
-      volumes:
-      - name: dotnet-storage
-        persistentVolumeClaim:
-          claimName: sqlserver-pvc
 
 ---
 # Deployment for Remix application
@@ -147,10 +107,3 @@ spec:
         env:
         - name: DATABASE_URL
           value: "Server=sqlserver;Database=mydb;User Id=sa;Password=YourStrong!Passw0rd;"
-        volumeMounts:
-        - name: remix-storage
-          mountPath: /app/data
-      volumes:
-      - name: remix-storage
-        persistentVolumeClaim:
-          claimName: sqlserver-pvc

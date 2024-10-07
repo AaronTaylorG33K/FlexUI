@@ -9,11 +9,16 @@ ENV ACCEPT_EULA=Y
 COPY ./sql/schema.sql /var/opt/mssql/data/
 COPY ./sql/seeds.sql /var/opt/mssql/data/
 
+# Set the correct permissions for the mssql user
+USER root
+RUN chown -R mssql:mssql /var/opt/mssql
+
+# Switch back to the mssql user
+USER mssql
+
 # Expose the SQL Server port
 EXPOSE 1433
 
-# Run the SQL Server and initialize the database
-CMD /opt/mssql/bin/sqlservr & sleep 30 && \
-    /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/schema.sql && \
-    /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong!Passw0rd -d master -i /var/opt/mssql/data/seeds.sql && \
-    wait
+
+# Run the SQL Server
+CMD /opt/mssql/bin/sqlservr
